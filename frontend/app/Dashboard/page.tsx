@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
-import { protectRoute } from "@/utils/ProtectedRoutes/ProtectedRoute"
 import { API, supabase } from "@/lib/supabse"
 
 interface Task {
@@ -17,96 +16,55 @@ interface Task {
 }
 
 export default function DashboardPage() {
-
   const router = useRouter()
 
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
 
-  // PROTECT ROUTE
-useEffect(() => {
-
-  const checkAuth = async () => {
-
-    await protectRoute(router, "user")
-  }
-
-  checkAuth()
-
-}, [])
-
-  // FETCH TASKS
   useEffect(() => {
-    fetchTasks()
-  }, [])
+    const init = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
 
-  async function fetchTasks() {
+        if (!session) {
+          router.replace("/")
+          return
+        }
 
-    try {
+        const user = session.user
+        const res = await fetch(`${API}/my-tasks/${user.id}`)
+        const data = await res.json()
 
-      const {
-        data: { user }
-      } = await supabase.auth.getUser()
-
-      if (!user) {
-
-        router.push("/")
-        return
+        setTasks(data || [])
+      } catch (error) {
+        console.log("Dashboard error:", error)
+      } finally {
+        setLoading(false)
       }
-
-      const res = await fetch(
-        `${API}/my-tasks/${user.id}`
-      )
-
-      const data = await res.json()
-
-      setTasks(data)
-
-    } catch (error) {
-
-      console.log(error)
-
-    } finally {
-
-      setLoading(false)
     }
-  }
 
-  // LOGOUT
+    init()
+  }, [router])
+
   async function logout() {
-
     await supabase.auth.signOut()
-
-    localStorage.removeItem("login")
-
-    router.push("/")
+    setTasks([])
+    router.replace("/")
   }
 
-  // LOADING
   if (loading) {
-
     return (
-
       <div className="min-h-screen flex items-center justify-center">
-
-        <h1 className="text-2xl font-bold">
-          Loading...
-        </h1>
-
+        <h1 className="text-2xl font-bold">Loading...</h1>
       </div>
     )
   }
 
   return (
-
     <div className="min-h-screen bg-gray-100">
 
-      {/* TOPBAR */}
       <div className="bg-white shadow-sm px-10 py-5 flex items-center justify-between">
-
-        <h1 className="text-3xl font-bold">
-          User Dashboard
-        </h1>
+        <h1 className="text-3xl font-bold">User Dashboard</h1>
 
         <button
           onClick={logout}
@@ -114,32 +72,23 @@ useEffect(() => {
         >
           Logout
         </button>
-
       </div>
 
-      {/* CONTENT */}
       <div className="p-10">
 
         {tasks.length === 0 ? (
-
           <div className="bg-white p-10 rounded-xl shadow text-center">
-
             <h2 className="text-2xl font-semibold mb-2">
               No Tasks Assigned
             </h2>
-
             <p className="text-gray-500">
               Waiting for admin to assign tasks.
             </p>
-
           </div>
-
         ) : (
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
             {tasks.map((task) => (
-
               <div
                 key={task.id}
                 className="bg-white rounded-xl shadow-md overflow-hidden"
@@ -160,21 +109,16 @@ useEffect(() => {
 
                     <span
                       className={`text-sm px-3 py-1 rounded-full text-white
-
-                      ${task.status === "pending"
-                        ? "bg-gray-500"
-
-                        : task.status === "assigned"
-                        ? "bg-blue-500"
-
-                        : task.status === "submitted"
-                        ? "bg-yellow-500"
-
-                        : task.status === "accepted"
-                        ? "bg-green-600"
-
-                        : "bg-red-500"
-                      }
+                        ${task.status === "pending"
+                          ? "bg-gray-500"
+                          : task.status === "assigned"
+                          ? "bg-blue-500"
+                          : task.status === "submitted"
+                          ? "bg-yellow-500"
+                          : task.status === "accepted"
+                          ? "bg-green-600"
+                          : "bg-red-500"
+                        }
                       `}
                     >
                       {task.status.replace("_", " ")}
@@ -188,17 +132,13 @@ useEffect(() => {
 
                   {/* FEEDBACK */}
                   {task.feedback && (
-
                     <div className="bg-red-50 border border-red-200 p-3 rounded-lg mb-5">
-
                       <p className="font-semibold text-red-600 mb-1">
                         Admin Feedback
                       </p>
-
                       <p className="text-sm text-gray-700">
                         {task.feedback}
                       </p>
-
                     </div>
                   )}
 
@@ -210,17 +150,13 @@ useEffect(() => {
                   </Link>
 
                 </div>
-
               </div>
-
             ))}
 
           </div>
-
         )}
 
       </div>
-
     </div>
   )
 }
