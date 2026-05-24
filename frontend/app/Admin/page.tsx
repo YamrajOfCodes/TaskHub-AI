@@ -65,45 +65,65 @@ export default function AdminPage() {
     resolver: yupResolver(taskSchema),
   })
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
+ useEffect(() => {
+  let mounted = true
 
-        if (!session) {
-          router.replace("/")
-          return
-        }
+  const init = async () => {
+    try {
+    
+      let { data: { session } } = await supabase.auth.getSession()
 
-        const user = session.user
+      if (!session) {
+        await new Promise((res) => setTimeout(res, 500))
 
-        const { data: roleData } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", user.id)
-          .single()
-
-        const role = roleData?.role
-
-        if (role !== "admin") {
-          router.replace("/")
-          return
-        }
-
-        await fetchTasks()
-        await fetchUsers()
-        await fetchSubmissions()
-
-      } catch (err) {
-        console.log("Admin init error:", err)
-        router.replace("/")
-      } finally {
-        setLoading(false)
+        const retry = await supabase.auth.getSession()
+        session = retry.data.session
       }
-    }
 
-    init()
-  }, [])
+      if (!mounted) return
+
+      if (!session) {
+        router.replace("/")
+        return
+      }
+
+      const user = session.user
+
+      const { data: roleData, error } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", user.id)
+        .single()
+
+      if (error || !roleData) {
+        console.log("ROLE ERROR:", error)
+        router.replace("/")
+        return
+      }
+
+      if (roleData.role !== "admin") {
+        router.replace("/")
+        return
+      }
+
+      await fetchTasks()
+      await fetchUsers()
+      await fetchSubmissions()
+
+    } catch (err) {
+      console.log("Admin init error:", err)
+      router.replace("/")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  init()
+
+  return () => {
+    mounted = false
+  }
+}, [])
 
  
   async function logout() {
