@@ -6,35 +6,41 @@ export const protectRoute = async (
   router: any,
   allowedRole: string
 ) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
 
-  const {
-    data: { user }
-  } = await supabase.auth.getUser()
+    if (!session) {
+      router.replace("/")
+      return
+    }
 
-  if (!user) {
+    const user = session.user
 
-    localStorage.removeItem("login")
+    const { data: roleData, error } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single()
 
+    if (error) {
+      console.log("Role fetch error:", error)
+      router.replace("/")
+      return
+    }
+
+    const role = roleData?.role
+
+    console.log("DATABASE ROLE:", role)
+
+    if (!role) return
+
+    if (role !== allowedRole) {
+      router.replace("/")
+      return
+    }
+
+  } catch (err) {
+    console.log("Protect route error:", err)
     router.replace("/")
-
-    return
-  }
-
-  const { data } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle()
-
-  const role = data?.role
-
-  console.log("DATABASE ROLE:", role)
-
-  
-  if (role !== allowedRole) {
-
-    router.replace("/")
-
-    return
   }
 }

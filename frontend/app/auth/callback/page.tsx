@@ -8,63 +8,51 @@ export default function AuthCallback() {
   const router = useRouter()
 
   useEffect(() => {
-   const syncUser = async () => {
+    const syncUser = async () => {
 
-  const {
-    data: { user }
-  } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
 
-  if (!user) {
-    router.push("/")
-    return
-  }
+      if (!session) {
+        router.replace("/")
+        return
+      }
 
-  // ADD HERE
-  const {
-    data: { session }
-  } = await supabase.auth.getSession()
+      const user = session.user
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", user.id)
+        .single()
 
-  if (session?.access_token) {
 
-    localStorage.setItem(
-      "login",
-      session.access_token
-    )
-  }
+      if (!existingUser) {
+        await supabase.from("users").insert({
+          id: user.id,
+          email: user.email,
+          name:
+            user.user_metadata?.full_name ||
+            user.user_metadata?.name,
+          avatar_url: user.user_metadata?.avatar_url,
+          role: "user"
+        })
+      }
 
-  // existing code below
-  const { data: existingUser } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", user.id)
-    .single()
+      const { data: userData } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", user.id)
+        .single()
 
-  if (!existingUser) {
+      const role = userData?.role
 
-    await supabase.from("users").insert({
-      id: user.id,
-      email: user.email,
-      name: user.user_metadata?.full_name || user.user_metadata?.name,
-      avatar_url: user.user_metadata?.avatar_url,
-      role: "user"
-    })
-  }
+      console.log("USER ROLE:", role)
 
-  const { data: userData } = await supabase
-    .from("users")
-    .select("role")
-    .eq("id", user.id)
-    .single()
-
-  if (userData?.role === "admin") {
-
-    router.push("/Admin")
-
-  } else {
-
-    router.push("/Dashboard")
-  }
-}
+      if (role === "admin") {
+        router.replace("/Admin")
+      } else {
+        router.replace("/Dashboard")
+      }
+    }
 
     syncUser()
   }, [router])
