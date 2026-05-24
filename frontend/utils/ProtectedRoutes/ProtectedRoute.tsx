@@ -6,41 +6,48 @@ export const protectRoute = async (
   router: any,
   allowedRole: string
 ) => {
-  try {
-    const { data: { session } } = await supabase.auth.getSession()
 
-    if (!session) {
-      router.replace("/")
-      return
-    }
+  // ✅ WAIT for session properly
+  const { data: { session }, error } = await supabase.auth.getSession()
 
-    const user = session.user
-
-    const { data: roleData, error } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single()
-
-    if (error) {
-      console.log("Role fetch error:", error)
-      router.replace("/")
-      return
-    }
-
-    const role = roleData?.role
-
-    console.log("DATABASE ROLE:", role)
-
-    if (!role) return
-
-    if (role !== allowedRole) {
-      router.replace("/")
-      return
-    }
-
-  } catch (err) {
-    console.log("Protect route error:", err)
+  if (error) {
+    console.log("Session error:", error)
     router.replace("/")
+    return
+  }
+
+  // 🔥 IMPORTANT: DO NOT redirect immediately if null (production lag fix)
+  if (!session) {
+    setTimeout(() => {
+      supabase.auth.getSession().then(({ data }) => {
+        if (!data.session) {
+          router.replace("/")
+        }
+      })
+    }, 500)
+
+    return
+  }
+
+  const user = session.user
+
+  const { data: roleData, error: roleError } = await supabase
+    .from("users")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  if (roleError) {
+    console.log("Role error:", roleError)
+    return
+  }
+
+  const role = roleData?.role
+
+  if (!role) return
+
+  if (role !== allowedRole) {
+    router.replace("/")
+    return
   }
 }
